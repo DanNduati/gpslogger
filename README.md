@@ -8,11 +8,11 @@
 
 ## Description
 - 2 different logging intervals in minutes
-	-> MOVEMENT_INTERVAL 
+	- MOVEMENT INTERVAL 
 		- triggered by a simple tilt sensor as interrupt using ON_CHANGE
 		- When it is activated it will log positions according to that time variable(5 minutes)
 		- After 2X movement interval time has passed (2x5=10minutes) it reverts back to 'BEACON_INTERVAL'
-	-> BEACON_INTERVAL
+	- BEACON INTERVAL
 		- Remains passive(deep sleep) until it receives a 'ping' from the rx unit it will then transfer all the logged positions from the logger to the RX unit
 - Transmissin of the logger data to the RX should occur by LoRa radio protocol
 - The data should have some form of encryption whilst stored on the logger and while being transferred from the logger to the RX and the RX should be able to decrypt the data
