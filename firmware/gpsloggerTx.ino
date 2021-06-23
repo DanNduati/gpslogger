@@ -197,8 +197,8 @@ void loop()
 {
   //Check battery level before doing anything else
   if(batteryLevelOK()){
-    alarmMatch(); // Set next alarm time using updated BEACON_INTERVAL and transmit depending on interval and beacon interval
-    //Incase a signal comes from the receiver, transmit as well 
+    
+    //Incase a signal comes from the receiver, transmit
     if(listener()){
       switch(loop_step) {
         case 0:
@@ -207,13 +207,18 @@ void loop()
           loop_step = 1;
           break;
         case 1:
-          transmit(latitude);
-          delay(100);
-          transmit(longitude);
-          delay(100);
+        int count;
+          for(count = 0; count < 2; count++){
+             transmit(latitude);
+            delay(100);
+            transmit(longitude);
+            delay(100);
           
-          // Update flash memory
-          flashStorage();
+            // Update flash memory
+            flashStorage();
+            delay(MOVEMENT_INTERVAL * 60 * 1000);//
+          }
+         
           loop_step = 0;
           break;
       }
@@ -343,19 +348,6 @@ void alarmMatch()
   rtc.setAlarmMinutes(rtc_mins); // Set next alarm time (minutes)
   rtc.setAlarmHours(rtc_hours); // Set next alarm time (hours)
 
-  //get location data
-  getLocation();
-  delay(100);
-  //transmit data
-  transmit(latitude);
-  delay(100);
-  transmit(longitude);
-  delay(100);
-  
-  //log data to flush memory
-  // Update flash memory
-  flashStorage();
-
 }
 
 //Tilt sensor interrupt.............
@@ -376,7 +368,6 @@ void tilt_sensor_interrupt(){
     alarmMatch();
     rtc.enableAlarm(rtc.MATCH_HHMMSS); // Alarm Match on hours, minutes and seconds
     rtc.attachInterrupt(alarmMatch); // Attach alarm interrupt
-    exit(0);//To avoid logging and sending data twice
   }
 
   //get location data
