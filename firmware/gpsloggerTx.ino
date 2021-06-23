@@ -4,6 +4,7 @@
 #include <FlashStorage.h>
 #include <RTCZero.h>
 #include <avr/dtostrf.h> 
+
 //Pin for battery monitoring
 #define VBATPIN A7
 
@@ -35,7 +36,6 @@ TinyGPSPlus gps;
 
  // Create an rtc object
 RTCZero rtc;
-
 
 //GPS parameters
 byte Hour, Minute, Second;
@@ -81,6 +81,7 @@ bool batteryLevelOK();
 void tilt_sensor_interrupt();
 void alarmMatch();
 bool listener();
+void flashStorage();
 
 void setup() 
 {
@@ -93,7 +94,7 @@ void setup()
     delay(1);
   }
   delay(100);
-  // Start the software serial port at the GPS's default baud
+  // Start the GPS's serial
   gpsSerial.begin(GPSBaud);
   delay(100);
   
@@ -127,9 +128,10 @@ void setup()
 
   pinMode(tilt_sensor,INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(tilt_sensor), tilt_sensor_interrupt, CHANGE);
+
+  
   // See if global variables have already been stored in flash
   // If they have, read them. If not, initialise them.
-  
   flashVars = flashVarsMem.read(); // Read the flash memory
   int csum = flashVars.PREFIX + flashVars.INTERVAL + flashVars.MOV_INTERVAL; // Sum the prefix and data
   csum = csum & 0xff; // Limit checksum to 8-bits
@@ -193,79 +195,33 @@ void setup()
 
 void loop()
 {
-  unsigned long loopStartTime = millis();
   //Check battery level before doing anything else
   if(batteryLevelOK()){
-    //only transmit when the receiver gets a signal
+    alarmMatch(); // Set next alarm time using updated BEACON_INTERVAL and transmit depending on interval and beacon interval
+    //Incase a signal comes from the receiver, transmit as well 
     if(listener()){
       switch(loop_step) {
-    
         case 0:
           Serial.println("Initializing");
-         break;
-    
-        case 1:
-           //comes here, then takes a GPS reading.. 
-          
-          if(use_movement_interval){
-            Serial.println("Movement interval alarm..");
-            
-            if(log_number<4){
-              Serial.println("Log_number<4, so logging GPS value and going to sleep...");
-              getLocation();
-              log_number++;
-              loop_step = 4;
-            }
-            else{
-              Serial.println("Log_number>=4, resetting it to 0 and sendin the data through Iriduium...");
-              getLocation();
-              log_number = 0;
-              loop_step = 2;
-              
-            }
-          }
-          else{
-            Serial.println("Getting GPS Data");
-            getLocation();
-            loop_step = 2;
-          }
+          getLocation();
+          loop_step = 1;
           break;
-    
-        case 2:
+        case 1:
           transmit(latitude);
           delay(100);
           transmit(longitude);
           delay(100);
-           int new_movement_interval = 0;
-           MOVEMENT_INTERVAL = new_movement_interval; // Update BEACON_INTERVAL
-            // Update flash memory
-            flashVars.PREFIX = 0xB5; // Reset the prefix (hopefully redundant!)
-            flashVars.MOV_INTERVAL = new_movement_interval; // Store the new beacon interval
-            flashVars.LAT = (char*)malloc(15);
-            strcpy(flashVars.LAT, latitude);
-            flashVars.LONG = (char*)malloc(15);
-            strcpy(flashVars.LONG, longitude);
-            int csum = flashVars.PREFIX + flashVars.INTERVAL + flashVars.MOV_INTERVAL; // Update the checksum
-            csum = csum & 0xff;
-            flashVars.CSUM = csum;
-            flashVarsMem.write(flashVars); // Write the flash variables
+          
+          // Update flash memory
+          flashStorage();
+          loop_step = 0;
           break;
       }
     }else{
-      //only Log Data to flush memory when there is no signal coming from the transmitter
-       int new_movement_interval = 0;
-       MOVEMENT_INTERVAL = new_movement_interval; // Update BEACON_INTERVAL
-        // Update flash memory
-        flashVars.PREFIX = 0xB5; // Reset the prefix (hopefully redundant!)
-        flashVars.MOV_INTERVAL = new_movement_interval; // Store the new beacon interval
-        flashVars.LAT = (char*)malloc(15);
-        strcpy(flashVars.LAT, latitude);
-        flashVars.LONG = (char*)malloc(15);
-        strcpy(flashVars.LONG, longitude);
-        int csum = flashVars.PREFIX + flashVars.INTERVAL + flashVars.MOV_INTERVAL; // Update the checksum
-        csum = csum & 0xff;
-        flashVars.CSUM = csum;
-        flashVarsMem.write(flashVars); // Write the flash variables
+      //only Log Data to flush memory when there is no signal coming from the Receiver
+     
+      // Update flash memory
+      flashStorage();
     }
   }else{
     Serial.println("Battery Voltage is below the Threshold.");   
@@ -363,8 +319,6 @@ void getLocation(){
  // RTC alarm interrupt
 void alarmMatch()
 { 
-
-  
   done_waiting = 1;
   
   int rtc_mins = rtc.getMinutes(); // Read the RTC minutes
@@ -388,6 +342,20 @@ void alarmMatch()
   rtc_hours = rtc_hours % 24; // Check for a day roll over
   rtc.setAlarmMinutes(rtc_mins); // Set next alarm time (minutes)
   rtc.setAlarmHours(rtc_hours); // Set next alarm time (hours)
+
+  //get location data
+  getLocation();
+  delay(100);
+  //transmit data
+  transmit(latitude);
+  delay(100);
+  transmit(longitude);
+  delay(100);
+  
+  //log data to flush memory
+  // Update flash memory
+  flashStorage();
+
 }
 
 //Tilt sensor interrupt.............
@@ -405,14 +373,47 @@ void tilt_sensor_interrupt(){
     use_movement_interval = 1;
     movements_during_movement_interval = 0;
     
-    
     alarmMatch();
     rtc.enableAlarm(rtc.MATCH_HHMMSS); // Alarm Match on hours, minutes and seconds
     rtc.attachInterrupt(alarmMatch); // Attach alarm interrupt
+    exit(0);//To avoid logging and sending data twice
   }
-  else{
-    Serial.println("(Only noting the movement_time");
-  }
+
+  //get location data
+  getLocation();
+  delay(100);
+
+ 
+  //transmit data
+  transmit(latitude);
+  delay(100);
+  transmit(longitude);
+  delay(100);
+  
+  //log data to flush memory
+  // Update flash memory
+  flashStorage();
+
   Serial.println("Attaching interrupt again (FOR NOTING THE LAST MOVEMENT time only)");
   attachInterrupt(digitalPinToInterrupt(tilt_sensor), tilt_sensor_interrupt, CHANGE);
+}
+
+void flashStorage(){
+  int new_movement_interval = 0;
+  MOVEMENT_INTERVAL = new_movement_interval; // Update BEACON_INTERVAL
+  // Update flash memory
+  flashVars.PREFIX = 0xB5; // Reset the prefix (hopefully redundant!)
+  flashVars.MOV_INTERVAL = new_movement_interval; // Store the new beacon interval
+  flashVars.LAT = (char*)malloc(15);
+  strcpy(flashVars.LAT, latitude);
+  flashVars.LONG = (char*)malloc(15);
+  strcpy(flashVars.LONG, longitude);
+  int csum = flashVars.PREFIX + flashVars.INTERVAL + flashVars.MOV_INTERVAL; // Update the checksum
+  csum = csum & 0xff;
+  flashVars.CSUM = csum;
+  flashVarsMem.write(flashVars); // Write the flash variables
+
+  //free allocated memory
+  free(flashVars.LAT);
+  free(flashVars.LONG);
 }
