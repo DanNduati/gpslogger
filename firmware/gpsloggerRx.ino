@@ -100,7 +100,7 @@ void loop() {
         Serial.print("RSSI: ");
         Serial.println(rf95.lastRssi(), DEC);
         //decode received data and store to sd card
-        decodeData();//pass the received buffer as a parameter
+        decodeData(incoming);//pass the received buffer as a parameter
         //writeGpsData(latitude, longitude);
       }
       else
@@ -173,8 +173,11 @@ void writeGpsData(float latitude, float longitude, float alt, float speedval, fl
   }
 }
 
-void decodeData(){
+void decodeData(char * buf){
   //decode the received encrypted data 
+  Serial.println((char*)buf);
+  //decrypt and divide payload 
+  
   //store the decoded data to sd card
   //writeGpsData();
 }
