@@ -2,20 +2,33 @@
 #include <SD.h>
 #include <Wire.h>
 #include <RH_RF95.h>
+#include <RTCZero.h> // M0 Real Time Clock
 
 //sd
 File gpsDataFile; //file to store gps data
 
-const int chipSelect = 4;
+const int chipSelect = 10;
 //rfm95x
 #define RFM95_CS 8
 #define RFM95_RST 4
 #define RFM95_INT 3
 #define RF95_FREQ 915.0 //LoRa radio module frequency, must match RX's freq!
+
 RH_RF95 rf95(RFM95_CS, RFM95_INT); //create an instance of the radio driver class
 long lastSendTime = 0; // last send time
 int interval = 10000; // ping interval in ms
 int16_t packetnum = 0; //packet counter
+
+RTCZero rtc;
+/* Change these values to set the current initial time */
+const byte seconds = 0;
+const byte minutes = 54;
+const byte hours = 18;
+
+/* Change these values to set the current initial date */
+const byte day = 25;
+const byte month = 6;
+const byte year = 21;
 
 void setup() {
   Serial.begin(115200);
@@ -29,7 +42,6 @@ void setup() {
   delay(10);
   while (!rf95.init()) {
     Serial.println("LoRa radio init failed");
-    Serial.println("Uncomment '#define SERIAL_DEBUG' in RH_RF95.cpp for detailed debug info");
     while (1);
   }
   Serial.println("LoRa radio init OK!");
@@ -49,6 +61,17 @@ void setup() {
   }
   Serial.println("card initialized.");
   writeDataHeader(); //table header for easier data readability
+  rtc.begin(); // initialize RTC
+
+  // Set the time
+  rtc.setHours(hours);
+  rtc.setMinutes(minutes);
+  rtc.setSeconds(seconds);
+
+  // Set the date
+  rtc.setDay(day);
+  rtc.setMonth(month);
+  rtc.setYear(year);
 }
 
 void loop() {
@@ -77,9 +100,8 @@ void loop() {
         Serial.print("RSSI: ");
         Serial.println(rf95.lastRssi(), DEC);
         //decode received data and store to sd card
-        float longitude = 0;//to be changed once max pushes logger code
-        float latitude = 0;//to be changed once max pushes logger code
-        writeGpsData(latitude,longitude);
+        decodeData();//pass the received buffer as a parameter
+        //writeGpsData(latitude, longitude);
       }
       else
       {
@@ -95,18 +117,52 @@ void loop() {
 
 void writeDataHeader() {
   gpsDataFile = SD.open("data.csv", FILE_WRITE);
-  gpsDataFile.print("latitude,longitude");
+  gpsDataFile.print("dateTime,latitude,longitude,alt,speed,course,hdop,satellites,batt,RSSI");
   gpsDataFile.println();
   gpsDataFile.close();
 }
 
-void writeGpsData(float latitude,float longitude) {
+void writeGpsData(float latitude, float longitude, float alt, float speedval, float courseval, float hdopval, float satelliteval, float battval, float rssival) {
   //open the file where the received gps data is to be written to
   gpsDataFile = SD.open("data.csv", FILE_WRITE);
   if (gpsDataFile) {
+    //store the datetime from the rtc
+    /* Change these values to set the current initial time */
+    byte seconds = rtc.getSeconds();
+    byte minutes = rtc.getMinutes();
+    byte hours = rtc.getHours();
+    byte day = rtc.getDay();
+    byte month = rtc.getMonth();
+    byte year = rtc.getYear();
+    gpsDataFile.print(hours);
+    gpsDataFile.print(":");
+    gpsDataFile.print(minutes);
+    gpsDataFile.print(":");
+    gpsDataFile.print(seconds);
+    gpsDataFile.print(" ");
+    gpsDataFile.print(year);
+    gpsDataFile.print('/');
+    gpsDataFile.print(month);
+    gpsDataFile.print('/');
+    gpsDataFile.print(day);
+    gpsDataFile.print(", ");
     gpsDataFile.print(latitude);
     gpsDataFile.print(", ");
-    gpsDataFile.println(longitude);
+    gpsDataFile.print(longitude);
+    gpsDataFile.print(", ");
+    gpsDataFile.print(alt);
+    gpsDataFile.print(", ");
+    gpsDataFile.print(speedval);
+    gpsDataFile.print(", ");
+    gpsDataFile.print(courseval);
+    gpsDataFile.print(", ");
+    gpsDataFile.print(hdopval);
+    gpsDataFile.print(", ");
+    gpsDataFile.print(satelliteval);
+    gpsDataFile.print(", ");
+    gpsDataFile.print(battval);
+    gpsDataFile.print(", ");
+    gpsDataFile.println(rssival);
     gpsDataFile.close();
     // print to the serial port too:
     Serial.println("data stored to sd card");
@@ -117,4 +173,8 @@ void writeGpsData(float latitude,float longitude) {
   }
 }
 
-
+void decodeData(){
+  //decode the received encrypted data 
+  //store the decoded data to sd card
+  //writeGpsData();
+}
