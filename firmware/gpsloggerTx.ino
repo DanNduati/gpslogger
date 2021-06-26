@@ -5,6 +5,12 @@
 #include <RTCZero.h>
 #include <avr/dtostrf.h> 
 
+//By default, Feather M0 uses SerialUSB and not Serial. Thus we define SerialUSB as Serial
+#if defined(ARDUINO_SAMD_ZERO) && defined(SERIAL_PORT_USBVIRTUAL)
+  // Required for Serial on Zero based boards
+  #define Serial SERIAL_PORT_USBVIRTUAL
+#endif
+
 //Pin for battery monitoring
 #define VBATPIN A7
 
@@ -367,6 +373,7 @@ char* getLocation(){
         float invalid = 000.00;        
         dtostrf(invalid,6, 1, Hdop);
       }
+      //Satellites
       if (gps.satellites.value())
       {
         itoa(gps.satellites.value(), Satellites, 10);
