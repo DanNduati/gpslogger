@@ -1,3 +1,6 @@
+#include <AES.h>
+#include <AES_config.h>
+#include <printf.h>
 #include <SPI.h>
 #include <SD.h>
 #include <Wire.h>
@@ -19,6 +22,12 @@ long lastSendTime = 0; // last send time
 int interval = 10000; // ping interval in ms
 int16_t packetnum = 0; //packet counter
 
+//AES encryption and decryption
+AES aes ; //create an instance of the aes class
+byte *key = (unsigned char*)"0123456789010123"; //encryption key
+unsigned long long int my_iv = 36753562; //intitalization vector
+
+//time
 RTCZero rtc;
 /* Change these values to set the current initial time */
 const byte seconds = 0;
@@ -94,7 +103,7 @@ void loop() {
       // Should be a reply message for us now
       if (rf95.recv(buf, &len))
       {
-        char * incoming = ((char*)buf);
+        byte * incoming = buf;
         Serial.print("Got reply: ");
         Serial.println((char*)buf);
         Serial.print("RSSI: ");
@@ -122,7 +131,7 @@ void writeDataHeader() {
   gpsDataFile.close();
 }
 
-void writeGpsData(float latitude, float longitude, float alt, float speedval, float courseval, float hdopval, float satelliteval, float battval, float rssival) {
+void writeTxData(char * latitude, char * longitude, char * alt, char * speedval, char * courseval, char * hdopval, char * satelliteval, char * battval, char* rssival) {
   //open the file where the received gps data is to be written to
   gpsDataFile = SD.open("data.csv", FILE_WRITE);
   if (gpsDataFile) {
@@ -173,11 +182,41 @@ void writeGpsData(float latitude, float longitude, float alt, float speedval, fl
   }
 }
 
-void decodeData(char * buf){
-  //decode the received encrypted data 
-  Serial.println((char*)buf);
-  //decrypt and divide payload 
+byte decryptData(int bits, byte * payload) {
+  int payloadSize = sizeof(payload);
+  byte * plain = payload; //ciphertext - encrypted plain text
+  int plainLength = sizeof(plain) - 1; // don't count the trailing /0 of the string !
+  int padedLength = plainLength + N_BLOCK - plainLength % N_BLOCK;
+  aes.iv_inc();
+  byte iv [N_BLOCK] ;
+  byte plain_p[padedLength];
+  byte cipher [padedLength] ;
+  byte check [padedLength] ;
+  aes.set_IV(my_iv);
+  aes.get_IV(iv);
+  //decrypt the payload
+  Serial.println("Decrypting the payload");
+  aes.do_aes_decrypt(cipher, padedLength, check, key, bits, iv);
+  printf("\n\nPLAIN :");
+  aes.printArray(plain, (bool)true);
+  printf("\nCIPHER:");
+  aes.printArray(cipher, (bool)false);
+  printf("\nCHECK :");
+  aes.printArray(check, (bool)true);
+  printf("\nIV    :");
+  aes.printArray(iv, 16);
+  printf("\n============================================================\n");
+  return check[sizeof(check)]; //return the decrypted payload
+}
+
+
+void decodeData(byte * buf) {
+  //decode the received encrypted data
+  Serial.println((char*)buf);//print the received message
+  //decrypt
+  byte * payload = decryptData(128,buf);
+  //split the payload
   
   //store the decoded data to sd card
-  //writeGpsData();
+  //writeTxData();
 }
