@@ -38,9 +38,15 @@ TinyGPSPlus gps;
 RTCZero rtc;
 
 //GPS parameters
-byte Hour, Minute, Second;
-char longitude[15] = "0.0000";
-char latitude[15] =  "0.0000";
+char gpsDate[32] = {"\0"};
+char gpsTime[32] = {"\0"};
+char longitude[15] = {"\0"};
+char latitude[15] =  {"\0"};
+char Altitude[10] = {"\0"};
+char Speed[10] = {"\0"};
+//Packect param
+char databuf[100];
+uint8_t dataoutgoing[100];
 
 //Battery level threshold -  Battery level should not go below this value -Change it to most suitable value
 const float bat_threshold = 3.0;
@@ -279,13 +285,42 @@ void getLocation(){
   while (gpsSerial.available() > 0){
     if (gps.encode(gpsSerial.read()))
     {
+      //date
+      if (gps.date.isValid())
+      {
+        sprintf(gpsDate, "%02d/%02d/%02d ", gps.date.month(), gps.date.day(), gps.date.year());
+        //Debug
+        Serial.print(gps.date.month());
+        Serial.print(F("/"));
+        Serial.print(gps.date.day());
+        Serial.print(F("/"));
+        Serial.print(gps.date.year());
+        
+      }else{
+        sprintf(gpsDate, "%02d/%02d/%02d ", 0, 0, 0);
+      }
+      //time
+      if (gps.time.isValid())
+      {
+        sprintf(gpsTime, "%02d:%02d:%02d ", gps.time.hour(), gps.time.minute(), gps.time.second());
+        //Debug
+        Serial.print("\t");
+        Serial.print(gps.time.hour());
+        Serial.print(F(":"));
+        Serial.print(gps.time.minute());
+        Serial.print(F(":"));
+        Serial.println(gps.time.second());
+      }else{
+        sprintf(gpsTime, "%02d:%02d:%02d", 0, 0, 0);   
+      }
+      //location
       if (gps.location.isValid())
       {
         dtostrf(gps.location.lat(),10, 7, latitude);
         dtostrf(gps.location.lng(),10, 7, longitude);
         Serial.print(latitude);
         Serial.print(F(","));
-        Serial.print(longitude);
+        Serial.println(longitude);
       }//if gps location is not valid, return 0.0000 as co-ordinates. This can happen when the Gps is unable to find satellites do to a poor antenna
       else
       {
@@ -293,17 +328,30 @@ void getLocation(){
         dtostrf(invalid,7, 5, latitude);
         dtostrf(invalid,7, 5, longitude);
       }
-    
-     
-      if (gps.time.isValid())
+      //altitude
+      if (gps.altitude.isValid())
       {
-        Hour =  gps.time.hour();
-        Minute = gps.time.minute();
-        Second = gps.time.second();
-        Serial.print(Hour);
-        Serial.print(Minute);
-        Serial.println(Second);
+        dtostrf(gps.altitude.meters(),7, 2, Altitude);
+        Serial.print(Altitude);
       }
+      else
+      {
+        float invalid = 0000.00;        
+        dtostrf(invalid,7, 2, Altitude);
+      }
+      //speed
+      if (gps.speed.isValid())
+      {
+        dtostrf(gps.speed.kmph(),6, 2, Speed);
+        Serial.print(Speed);
+      }
+      else
+      {
+        float invalid = 000.00;        
+        dtostrf(invalid,6, 2, Speed);
+      }
+      //course
+     
     }
   }
  }
