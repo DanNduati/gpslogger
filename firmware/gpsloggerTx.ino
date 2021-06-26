@@ -44,6 +44,10 @@ char longitude[15] = {"\0"};
 char latitude[15] =  {"\0"};
 char Altitude[10] = {"\0"};
 char Speed[10] = {"\0"};
+char Course[10] = {"\0"};
+char Hdop[10] = {"\0"};
+
+
 //Packect param
 char databuf[100];
 uint8_t dataoutgoing[100];
@@ -351,7 +355,28 @@ void getLocation(){
         dtostrf(invalid,6, 2, Speed);
       }
       //course
-     
+      if (gps.course.isValid())
+      {
+        dtostrf(gps.course.deg(),7, 2, Course);
+        Serial.print(Course);
+        
+      }
+      else
+      {
+        float invalid = 000.00;        
+        dtostrf(invalid,7, 2, Course);
+      }
+      //hdop
+      if (gps.hdop.isValid())
+      {
+        dtostrf(gps.hdop.hdop(),6, 1, Hdop);
+        Serial.print(Hdop);
+      }
+      else
+      {
+        float invalid = 000.00;        
+        dtostrf(invalid,6, 1, Hdop);
+      }
     }
   }
  }
