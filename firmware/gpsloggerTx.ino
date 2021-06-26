@@ -212,28 +212,20 @@ void loop()
     
     //Incase a signal comes from the receiver, transmit
     if(listener()){
-      switch(loop_step) {
-        case 0:
-          Serial.println("Initializing");
-          getLocation();
-          loop_step = 1;
-          break;
-        case 1:
-        int count;
-          for(count = 0; count < 2; count++){
-             transmit(latitude);
-            delay(100);
-            transmit(longitude);
-            delay(100);
+        for(count = 0; count < 2; count++){
+          char *gpsdata = getLocation();
+          char batbuf[10];
+          float batval = measureBattery();
+          dtostrf(batval,6, 3, batbuf);
+          sprintf(PAYLOAD, "%s,%s", gpsdata, batbuf);
           
-            // Update flash memory
-            flashStorage();
-            delay(MOVEMENT_INTERVAL * 60 * 1000);//
-          }
-         
-          loop_step = 0;
-          break;
-      }
+          //transmit data
+          transmit(PAYLOAD);
+        
+          // Update flash memory
+          flashStorage();
+          delay(MOVEMENT_INTERVAL * 60 * 1000);//
+        }
     }else{
       //only Log Data to flush memory when there is no signal coming from the Receiver
      
@@ -245,15 +237,10 @@ void loop()
   }
 }
 
-void transmit(char radiopacket[20]){
+void transmit(char radiopacket[150]){
   Serial.println("Transmitting..."); // Send a megpsSerialage to rf95_server
-  itoa(packetnum++, radiopacket+13, 10);
-  Serial.print("Sending "); Serial.println(radiopacket);
-  radiopacket[19] = 0;
-  
-  Serial.println("Sending...");
   delay(10);
-  rf95.send((uint8_t *)radiopacket, 20);
+  rf95.send((uint8_t *)radiopacket, sizeof(radiopacket));
 
   Serial.println("Waiting for packet to complete..."); 
   delay(10);
@@ -465,17 +452,15 @@ void tilt_sensor_interrupt(){
     rtc.enableAlarm(rtc.MATCH_HHMMSS); // Alarm Match on hours, minutes and seconds
     rtc.attachInterrupt(alarmMatch); // Attach alarm interrupt
   }
-
-  //get location data
-  getLocation();
-  delay(100);
-
- 
+  
+  char *gpsdata = getLocation();
+  char batbuf[10];
+  float batval = measureBattery();
+  dtostrf(batval,6, 3, batbuf);
+  sprintf(PAYLOAD, "%s,%s", gpsdata, batbuf);
+  
   //transmit data
-  transmit(latitude);
-  delay(100);
-  transmit(longitude);
-  delay(100);
+  transmit(PAYLOAD);
   
   //log data to flush memory
   // Update flash memory
