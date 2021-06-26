@@ -46,6 +46,7 @@ char Altitude[10] = {"\0"};
 char Speed[10] = {"\0"};
 char Course[10] = {"\0"};
 char Hdop[10] = {"\0"};
+char Satellites[5] = {"\0"};
 
 
 //Packect param
@@ -376,6 +377,16 @@ void getLocation(){
       {
         float invalid = 000.00;        
         dtostrf(invalid,6, 1, Hdop);
+      }
+      if (gps.satellites.value())
+      {
+        itoa(gps.satellites.value(), Satellites, 10);
+        Serial.print(Satellites);
+      }
+      else
+      {
+        int invalid = 0;        
+        itoa(invalid, Satellites, 10);
       }
     }
   }
