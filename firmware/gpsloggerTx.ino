@@ -50,8 +50,8 @@ char Satellites[5] = {"\0"};
 
 
 //Packect param
-char databuf[100];
-uint8_t dataoutgoing[100];
+char PAYLOAD[200];
+
 
 //Battery level threshold -  Battery level should not go below this value -Change it to most suitable value
 const float bat_threshold = 3.0;
@@ -87,7 +87,8 @@ FlashVarsStruct flashVars; // Define the global to hold the variables
 
 //function declarations
 void transmit(char radiopacket[20]);
-void getLocation();
+char* getLocation();
+float measureBattery();
 bool batteryLevelOK();
 void tilt_sensor_interrupt();
 void alarmMatch();
@@ -286,7 +287,8 @@ bool listener(){
   }
 }
 
-void getLocation(){
+char* getLocation(){
+  static char GPSdata[150];
   while (gpsSerial.available() > 0){
     if (gps.encode(gpsSerial.read()))
     {
@@ -390,14 +392,24 @@ void getLocation(){
       }
     }
   }
+  sprintf(GPSdata, "%s,%s,%s,%s,%s,%s,%s,%s,%s", gpsDate, gpsTime, latitude, longitude, Altitude, Speed, Course, Hdop, Satellites);
+  return GPSdata;
  }
 
- bool batteryLevelOK(){
+
+ float measureBattery(){
   float measuredvbat = analogRead(VBATPIN);
   measuredvbat *= 2;    // we (2 voltage dividers resistor) divided by 2, so multiply back
   measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
   measuredvbat /= 1024; // convert to voltage
+  
+  return measuredvbat;
+ }
+
  
+ bool batteryLevelOK(){
+  
+   float measuredvbat = measureBattery();
    if(measuredvbat < bat_threshold){
           return false;
    }else{
