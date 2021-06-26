@@ -83,8 +83,16 @@ typedef struct { // Define a struct to hold the flash variable(s)
   int PREFIX; // Flash storage prefix (0xB5); used to test if flash has been written to before 
   int INTERVAL; // Message interval in minutes
   int MOV_INTERVAL; //movement interval
-  char *LONG; //longitude 
+  char *DATE; //date
+  char *TIME; //time
+  char *LONG; //longitude
   char *LAT; //latitude
+  char *ALT; //altitude
+  char *SPEED; //speed  
+  char *COURSE; //course
+  char *HDOP; //hdop
+  char *SAT; //satellite
+  float BAT; //battery level
   int CSUM; // Flash storage checksum; the modulo-256 sum of PREFIX and INTERVAL; used to check flash data integrity
 } FlashVarsStruct;
 
@@ -161,10 +169,26 @@ void setup()
       
       //SET IT TO MOVEMENT_INTERVAL..
       flashVars.MOV_INTERVAL = MOVEMENT_INTERVAL;
+      flashVars.DATE = (char*)malloc(15);
+      strcpy(flashVars.DATE, gpsDate);
+      flashVars.TIME = (char*)malloc(15);
+      strcpy(flashVars.TIME, gpsTime);
       flashVars.LAT = (char*)malloc(15);
       strcpy(flashVars.LAT, latitude);
       flashVars.LONG = (char*)malloc(15);
       strcpy(flashVars.LONG, longitude);
+      flashVars.ALT = (char*)malloc(15);
+      strcpy(flashVars.ALT, Altitude);
+      flashVars.SPEED = (char*)malloc(10);
+      strcpy(flashVars.SPEED, Speed);
+      flashVars.COURSE = (char*)malloc(10);
+      strcpy(flashVars.COURSE, Course);
+      flashVars.HDOP = (char*)malloc(10);
+      strcpy(flashVars.HDOP, Hdop);
+      flashVars.SAT = (char*)malloc(5);
+      strcpy(flashVars.SAT, Satellites);
+      flashVars.BAT = measureBattery();
+      
       csum = flashVars.PREFIX + flashVars.INTERVAL + flashVars.MOV_INTERVAL; // Initialise the checksum
       csum = csum & 0xff;
       flashVars.CSUM = csum;
@@ -173,8 +197,16 @@ void setup()
       flashVarsMem.write(flashVars); // Write the flash variables
       
       //free allocated memory
+      free(flashVars.DATE);
+      free(flashVars.TIME);
       free(flashVars.LAT);
       free(flashVars.LONG);
+      free(flashVars.ALT);
+      free(flashVars.SPEED);
+      free(flashVars.COURSE);
+      free(flashVars.HDOP);
+      free(flashVars.SAT);
+     
       //READING updated flash memory.
       flashVars = flashVarsMem.read(); // Read the flash memory
     }
@@ -185,19 +217,41 @@ void setup()
     // Flash data is corrupt or hasn't been initialised so do that now
     flashVars.PREFIX = 0xB5; // Initialise the prefix
     flashVars.INTERVAL = BEACON_INTERVAL; // Initialise the beacon interval
-    flashVars.MOV_INTERVAL = MOVEMENT_INTERVAL; //movement interval
+    flashVars.MOV_INTERVAL = MOVEMENT_INTERVAL;
+    flashVars.DATE = (char*)malloc(15);
+    strcpy(flashVars.DATE, gpsDate);
+    flashVars.TIME = (char*)malloc(15);
+    strcpy(flashVars.TIME, gpsTime);
     flashVars.LAT = (char*)malloc(15);
     strcpy(flashVars.LAT, latitude);
     flashVars.LONG = (char*)malloc(15);
     strcpy(flashVars.LONG, longitude);
+    flashVars.ALT = (char*)malloc(15);
+    strcpy(flashVars.ALT, Altitude);
+    flashVars.SPEED = (char*)malloc(10);
+    strcpy(flashVars.SPEED, Speed);
+    flashVars.COURSE = (char*)malloc(10);
+    strcpy(flashVars.COURSE, Course);
+    flashVars.HDOP = (char*)malloc(10);
+    strcpy(flashVars.HDOP, Hdop);
+    flashVars.SAT = (char*)malloc(5);
+    strcpy(flashVars.SAT, Satellites);
+      flashVars.BAT = measureBattery();
     csum = flashVars.PREFIX + flashVars.INTERVAL + flashVars.MOV_INTERVAL; // Initialise the checksum
     csum = csum & 0xff;
     flashVars.CSUM = csum;
     flashVarsMem.write(flashVars); // Write the flash variables
 
     //free allocated memory
+    free(flashVars.DATE);
+    free(flashVars.TIME);
     free(flashVars.LAT);
     free(flashVars.LONG);
+    free(flashVars.ALT);
+    free(flashVars.SPEED);
+    free(flashVars.COURSE);
+    free(flashVars.HDOP);
+    free(flashVars.SAT);
   }
 
   rtc.begin(); // Start the RTC now that BEACON_INTERVAL has been updated
@@ -218,6 +272,7 @@ void loop()
     
     //Incase a signal comes from the receiver, transmit
     if(listener()){
+        int count;
         for(count = 0; count < 2; count++){
           char *gpsdata = getLocation();
           char batbuf[10];
@@ -483,16 +538,38 @@ void flashStorage(){
   // Update flash memory
   flashVars.PREFIX = 0xB5; // Reset the prefix (hopefully redundant!)
   flashVars.MOV_INTERVAL = new_movement_interval; // Store the new beacon interval
+  flashVars.DATE = (char*)malloc(15);
+  strcpy(flashVars.DATE, gpsDate);
+  flashVars.TIME = (char*)malloc(15);
+  strcpy(flashVars.TIME, gpsTime);
   flashVars.LAT = (char*)malloc(15);
   strcpy(flashVars.LAT, latitude);
   flashVars.LONG = (char*)malloc(15);
   strcpy(flashVars.LONG, longitude);
+  flashVars.ALT = (char*)malloc(15);
+  strcpy(flashVars.ALT, Altitude);
+  flashVars.SPEED = (char*)malloc(10);
+  strcpy(flashVars.SPEED, Speed);
+  flashVars.COURSE = (char*)malloc(10);
+  strcpy(flashVars.COURSE, Course);
+  flashVars.HDOP = (char*)malloc(10);
+  strcpy(flashVars.HDOP, Hdop);
+  flashVars.SAT = (char*)malloc(5);
+  strcpy(flashVars.SAT, Satellites);
+  flashVars.BAT = measureBattery();
   int csum = flashVars.PREFIX + flashVars.INTERVAL + flashVars.MOV_INTERVAL; // Update the checksum
   csum = csum & 0xff;
   flashVars.CSUM = csum;
   flashVarsMem.write(flashVars); // Write the flash variables
 
   //free allocated memory
+  free(flashVars.DATE);
+  free(flashVars.TIME);
   free(flashVars.LAT);
   free(flashVars.LONG);
+  free(flashVars.ALT);
+  free(flashVars.SPEED);
+  free(flashVars.COURSE);
+  free(flashVars.HDOP);
+  free(flashVars.SAT);
 }
