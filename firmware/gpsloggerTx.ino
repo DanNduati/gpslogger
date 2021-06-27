@@ -4,6 +4,9 @@
 #include <FlashStorage.h>
 #include <RTCZero.h>
 #include <avr/dtostrf.h> 
+#include <AES.h>
+#include <AES_config.h>
+#include <printf.h>
 
 //By default, Feather M0 uses SerialUSB and not Serial. Thus we define SerialUSB as Serial
 #if defined(ARDUINO_SAMD_ZERO) && defined(SERIAL_PORT_USBVIRTUAL)
@@ -24,6 +27,11 @@
 
 // Singleton instance of the radio driver
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
+
+//AES encryption and decryption
+AES aes ; //create an instance of the aes class
+byte *key = (unsigned char*)"0123456789010123"; //encryption key
+unsigned long long int my_iv = 36753562; //intitalization vector
 
 int16_t packetnum = 0;  // packet counter, we increment per xmigpsSerialion
 
@@ -306,7 +314,26 @@ bool listener(){
     return false;
   }
 }
-
+byte encryptData(int bits, byte * payload){
+  aes.iv_inc();
+  int payloadSize = sizeof(payload);
+  byte * plain = payload; //ciphertext - encrypted plain text
+  int plainLength = sizeof(plain) - 1; // don't count the trailing /0 of the string !
+  int padedLength = plainLength + N_BLOCK - plainLength % N_BLOCK;
+  byte iv [N_BLOCK] ;
+  byte plain_p[padedLength];
+  byte cipher [padedLength] ;
+  byte check [padedLength] ;
+  aes.set_IV(my_iv);
+  aes.get_IV(iv);
+  //encrypt the payload
+  Serial.println("Encrypting payload");
+  aes.do_aes_encrypt(cipher, padedLength, check, key, bits, iv);
+  return check[sizeof(check)]; //return the encrypted payload
+}
+void encodeData(byte *buf){
+   byte * payload = encryptData(128,buf);
+}
 void getLocation(){
   
   while (gpsSerial.available() > 0){
