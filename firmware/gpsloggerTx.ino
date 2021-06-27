@@ -55,10 +55,6 @@ char Hdop[10] = {"\0"};
 char Satellites[5] = {"\0"};
 
 
-//Packect param
-char PAYLOAD[200];
-
-
 //Battery level threshold -  Battery level should not go below this value -Change it to most suitable value
 const float bat_threshold = 3.0;
 
@@ -70,7 +66,6 @@ int tilt_sensor = A5;
 volatile unsigned long last_movement_time =0;
 int movements_during_movement_interval = 0; //number of movements occured during MOVEMENT_INTERVAL time... (if movement_interval was enabled)
 volatile bool done_waiting = 0; //a variable to keep check of the state.
-volatile int log_number = 0;
 long iterationCounter = 0; // Increment each time a transmission is attempted
 
 
@@ -83,8 +78,6 @@ typedef struct { // Define a struct to hold the flash variable(s)
   int PREFIX; // Flash storage prefix (0xB5); used to test if flash has been written to before 
   int INTERVAL; // Message interval in minutes
   int MOV_INTERVAL; //movement interval
-  char *DATE; //date
-  char *TIME; //time
   char *LONG; //longitude
   char *LAT; //latitude
   char *ALT; //altitude
@@ -101,7 +94,7 @@ FlashVarsStruct flashVars; // Define the global to hold the variables
 
 //function declarations
 void transmit(char radiopacket[20]);
-char* getLocation();
+void getLocation();
 float measureBattery();
 bool batteryLevelOK();
 void tilt_sensor_interrupt();
@@ -169,10 +162,6 @@ void setup()
       
       //SET IT TO MOVEMENT_INTERVAL..
       flashVars.MOV_INTERVAL = MOVEMENT_INTERVAL;
-      flashVars.DATE = (char*)malloc(15);
-      strcpy(flashVars.DATE, gpsDate);
-      flashVars.TIME = (char*)malloc(15);
-      strcpy(flashVars.TIME, gpsTime);
       flashVars.LAT = (char*)malloc(15);
       strcpy(flashVars.LAT, latitude);
       flashVars.LONG = (char*)malloc(15);
@@ -197,8 +186,7 @@ void setup()
       flashVarsMem.write(flashVars); // Write the flash variables
       
       //free allocated memory
-      free(flashVars.DATE);
-      free(flashVars.TIME);
+ 
       free(flashVars.LAT);
       free(flashVars.LONG);
       free(flashVars.ALT);
@@ -218,10 +206,6 @@ void setup()
     flashVars.PREFIX = 0xB5; // Initialise the prefix
     flashVars.INTERVAL = BEACON_INTERVAL; // Initialise the beacon interval
     flashVars.MOV_INTERVAL = MOVEMENT_INTERVAL;
-    flashVars.DATE = (char*)malloc(15);
-    strcpy(flashVars.DATE, gpsDate);
-    flashVars.TIME = (char*)malloc(15);
-    strcpy(flashVars.TIME, gpsTime);
     flashVars.LAT = (char*)malloc(15);
     strcpy(flashVars.LAT, latitude);
     flashVars.LONG = (char*)malloc(15);
@@ -236,15 +220,14 @@ void setup()
     strcpy(flashVars.HDOP, Hdop);
     flashVars.SAT = (char*)malloc(5);
     strcpy(flashVars.SAT, Satellites);
-      flashVars.BAT = measureBattery();
+    flashVars.BAT = measureBattery();
     csum = flashVars.PREFIX + flashVars.INTERVAL + flashVars.MOV_INTERVAL; // Initialise the checksum
     csum = csum & 0xff;
     flashVars.CSUM = csum;
     flashVarsMem.write(flashVars); // Write the flash variables
 
     //free allocated memory
-    free(flashVars.DATE);
-    free(flashVars.TIME);
+    
     free(flashVars.LAT);
     free(flashVars.LONG);
     free(flashVars.ALT);
@@ -272,34 +255,22 @@ void loop()
     
     //Incase a signal comes from the receiver, transmit
     if(listener()){
-        int count;
-        for(count = 0; count < 2; count++){
-          char *gpsdata = getLocation();
-          char batbuf[10];
-          float batval = measureBattery();
-          dtostrf(batval,6, 3, batbuf);
-          sprintf(PAYLOAD, "%s,%s", gpsdata, batbuf);
-          
-          //transmit data
-          transmit(PAYLOAD);
-        
-          // Update flash memory
-          flashStorage();
-          delay(MOVEMENT_INTERVAL * 60 * 1000);//
-        }
-    }else{
-      //only Log Data to flush memory when there is no signal coming from the Receiver
-     
-      // Update flash memory
-      flashStorage();
+      //transmit data
+      transmit();
+    
     }
   }else{
     Serial.println("Battery Voltage is below the Threshold.");   
   }
 }
 
-void transmit(char radiopacket[150]){
-  Serial.println("Transmitting..."); // Send a megpsSerialage to rf95_server
+void transmit(){
+  char radiopacket[256];
+  flashVars = flashVarsMem.read();
+  char batbuf[10];
+  dtostrf(flashVars.BAT, 6, 3, batbuf);
+  sprintf(radiopacket, "%s,%s,%s,%s,%s,%s,%s,%s", flashVars.LAT, flashVars.LONG, flashVars.ALT, flashVars.SPEED, flashVars.COURSE, flashVars.HDOP, flashVars.SAT, batbuf);
+  Serial.println("Transmitting..."); 
   delay(10);
   rf95.send((uint8_t *)radiopacket, sizeof(radiopacket));
 
@@ -320,13 +291,14 @@ bool listener(){
       Serial.print("Got reply: ");
       Serial.println((char*)buf);
       Serial.print("RgpsSerialI: ");
-      Serial.println(rf95.lastRssi(), DEC);    
+      Serial.println(rf95.lastRssi(), DEC); 
+      return true;   
     }
     else
     {
       Serial.println("Receive failed");
+      return false;
     }
-    return true;
   }
   else
   {
@@ -335,39 +307,11 @@ bool listener(){
   }
 }
 
-char* getLocation(){
-  static char GPSdata[150];
+void getLocation(){
+  
   while (gpsSerial.available() > 0){
     if (gps.encode(gpsSerial.read()))
     {
-      //date
-      if (gps.date.isValid())
-      {
-        sprintf(gpsDate, "%02d/%02d/%02d ", gps.date.month(), gps.date.day(), gps.date.year());
-        //Debug
-        Serial.print(gps.date.month());
-        Serial.print(F("/"));
-        Serial.print(gps.date.day());
-        Serial.print(F("/"));
-        Serial.print(gps.date.year());
-        
-      }else{
-        sprintf(gpsDate, "%02d/%02d/%02d ", 0, 0, 0);
-      }
-      //time
-      if (gps.time.isValid())
-      {
-        sprintf(gpsTime, "%02d:%02d:%02d ", gps.time.hour(), gps.time.minute(), gps.time.second());
-        //Debug
-        Serial.print("\t");
-        Serial.print(gps.time.hour());
-        Serial.print(F(":"));
-        Serial.print(gps.time.minute());
-        Serial.print(F(":"));
-        Serial.println(gps.time.second());
-      }else{
-        sprintf(gpsTime, "%02d:%02d:%02d", 0, 0, 0);   
-      }
       //location
       if (gps.location.isValid())
       {
@@ -441,8 +385,6 @@ char* getLocation(){
       }
     }
   }
-  sprintf(GPSdata, "%s,%s,%s,%s,%s,%s,%s,%s,%s", gpsDate, gpsTime, latitude, longitude, Altitude, Speed, Course, Hdop, Satellites);
-  return GPSdata;
  }
 
 
@@ -515,14 +457,8 @@ void tilt_sensor_interrupt(){
     rtc.attachInterrupt(alarmMatch); // Attach alarm interrupt
   }
   
-  char *gpsdata = getLocation();
-  char batbuf[10];
-  float batval = measureBattery();
-  dtostrf(batval,6, 3, batbuf);
-  sprintf(PAYLOAD, "%s,%s", gpsdata, batbuf);
-  
-  //transmit data
-  transmit(PAYLOAD);
+  getLocation();
+  delay(100);
   
   //log data to flush memory
   // Update flash memory
@@ -538,10 +474,6 @@ void flashStorage(){
   // Update flash memory
   flashVars.PREFIX = 0xB5; // Reset the prefix (hopefully redundant!)
   flashVars.MOV_INTERVAL = new_movement_interval; // Store the new beacon interval
-  flashVars.DATE = (char*)malloc(15);
-  strcpy(flashVars.DATE, gpsDate);
-  flashVars.TIME = (char*)malloc(15);
-  strcpy(flashVars.TIME, gpsTime);
   flashVars.LAT = (char*)malloc(15);
   strcpy(flashVars.LAT, latitude);
   flashVars.LONG = (char*)malloc(15);
@@ -563,8 +495,6 @@ void flashStorage(){
   flashVarsMem.write(flashVars); // Write the flash variables
 
   //free allocated memory
-  free(flashVars.DATE);
-  free(flashVars.TIME);
   free(flashVars.LAT);
   free(flashVars.LONG);
   free(flashVars.ALT);
