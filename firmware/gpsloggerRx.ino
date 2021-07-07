@@ -1,6 +1,3 @@
-#include <AES.h>
-#include <AES_config.h>
-#include <printf.h>
 #include <SPI.h>
 #include <SD.h>
 #include <Wire.h>
@@ -21,11 +18,9 @@ RH_RF95 rf95(RFM95_CS, RFM95_INT); //create an instance of the radio driver clas
 long lastSendTime = 0; // last send time
 int interval = 10000; // ping interval in ms
 int16_t packetnum = 0; //packet counter
-
-//AES encryption and decryption
-AES aes ; //create an instance of the aes class
-byte *key = (unsigned char*)"0123456789010123"; //encryption key
-unsigned long long int my_iv = 36753562; //intitalization vector
+//payload split variables
+#define maxWordCount 10
+char *Words[maxWordCount];
 
 //time
 RTCZero rtc;
@@ -131,7 +126,7 @@ void writeDataHeader() {
   gpsDataFile.close();
 }
 
-void writeTxData(char * latitude, char * longitude, char * alt, char * speedval, char * courseval, char * hdopval, char * satelliteval, char * battval, char* rssival) {
+void writeTxData(char * latitude, char * longitude, char * alt, char * speedval, char * courseval, char * hdopval, char * satelliteval, char * battval, int rssival) {
   //open the file where the received gps data is to be written to
   gpsDataFile = SD.open("data.csv", FILE_WRITE);
   if (gpsDataFile) {
@@ -182,41 +177,37 @@ void writeTxData(char * latitude, char * longitude, char * alt, char * speedval,
   }
 }
 
-byte decryptData(int bits, byte * payload) {
-  int payloadSize = sizeof(payload);
-  byte * plain = payload; //ciphertext - encrypted plain text
-  int plainLength = sizeof(plain) - 1; // don't count the trailing /0 of the string !
-  int padedLength = plainLength + N_BLOCK - plainLength % N_BLOCK;
-  aes.iv_inc();
-  byte iv [N_BLOCK] ;
-  byte plain_p[padedLength];
-  byte cipher [padedLength] ;
-  byte check [padedLength] ;
-  aes.set_IV(my_iv);
-  aes.get_IV(iv);
-  //decrypt the payload
-  Serial.println("Decrypting the payload");
-  aes.do_aes_decrypt(cipher, padedLength, check, key, bits, iv);
-  printf("\n\nPLAIN :");
-  aes.printArray(plain, (bool)true);
-  printf("\nCIPHER:");
-  aes.printArray(cipher, (bool)false);
-  printf("\nCHECK :");
-  aes.printArray(check, (bool)true);
-  printf("\nIV    :");
-  aes.printArray(iv, 16);
-  printf("\n============================================================\n");
-  return check[sizeof(check)]; //return the decrypted payload
-}
 
+byte * splitPayload(byte * str) {
+  //convert byte array to string
+  char payloadStr[sizeof(str)+1];
+  memcpy(payloadStr,str, sizeof(str));
+  payloadStr[sizeof(str)]  = 0; //null termination
+  //split the string via strtok
+  byte wordCount = 0;
+  char *item = strtok(payloadStr,",");//get the first word
+  while(item != NULL){//loop through all the comma seperated variables
+    Words[wordCount] = item;
+    item = strtok (NULL, " ,"); //getting subsequence word
+    Serial.println(Words[wordCount]);
+    wordCount++;
+    //delay(100);
+  }
+  return 0;
+}
 
 void decodeData(byte * buf) {
   //decode the received encrypted data
   Serial.println((char*)buf);//print the received message
   //decrypt
-  byte * payload = decryptData(128,buf);
-  //split the payload
-  
+  //byte  payload = decryptData(128, buf);
+  //split the comma seperated values of the payload
+  splitPayload(buf);
   //store the decoded data to sd card
-  //writeTxData();
+  //get the RSSI
+  int rssiVal = rf95.lastRssi();
+  //store the data to the sdcard
+  writeTxData(Words[0],Words[1],Words[2],Words[4],Words[4],Words[5],Words[6],Words[7],rssiVal);
+  //clear payload array
+  memset(Words,0,sizeof(Words));
 }
