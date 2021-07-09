@@ -98,7 +98,7 @@ void loop() {
       // Should be a reply message for us now
       if (rf95.recv(buf, &len))
       {
-        byte * incoming = buf;
+        char * incoming = (char*)buf;
         Serial.print("Got reply: ");
         Serial.println((char*)buf);
         Serial.print("RSSI: ");
@@ -178,13 +178,13 @@ void writeTxData(char * latitude, char * longitude, char * alt, char * speedval,
 }
 
 
-byte * splitPayload(byte * str) {
+char * splitPayload(char * str) {
   //convert byte array to string
   char payloadStr[sizeof(str)+1];
   memcpy(payloadStr,str, sizeof(str));
   payloadStr[sizeof(str)]  = 0; //null termination
   //split the string via strtok
-  byte wordCount = 0;
+  int wordCount = 0;
   char *item = strtok(payloadStr,",");//get the first word
   while(item != NULL){//loop through all the comma seperated variables
     Words[wordCount] = item;
@@ -196,7 +196,7 @@ byte * splitPayload(byte * str) {
   return 0;
 }
 
-void decodeData(byte * buf) {
+void decodeData(char * buf) {
   //decode the received encrypted data
   Serial.println((char*)buf);//print the received message
   //decrypt
