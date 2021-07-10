@@ -272,7 +272,8 @@ void transmit(){
   char batbuf[10];
   dtostrf(flashVars.BAT, 6, 3, batbuf);
   sprintf(radiopacket, "%s,%s,%s,%s,%s,%s,%s,%s", flashVars.LAT, flashVars.LONG, flashVars.ALT, flashVars.SPEED, flashVars.COURSE, flashVars.HDOP, flashVars.SAT, batbuf);
-  Serial.println("Transmitting..."); 
+  Serial.print("Transmitting: "); 
+  Serial.println(radiopacket);
   delay(10);
   rf95.send((uint8_t *)radiopacket, sizeof(radiopacket));
   Serial.println("Waiting for packet to complete..."); 
