@@ -292,7 +292,7 @@ bool listener(){
    {
       Serial.print("Got reply: ");
       Serial.println((char*)buf);
-      Serial.print("RgpsSerialI: ");
+      Serial.print("RSSI: ");
       Serial.println(rf95.lastRssi(), DEC); 
       return true;   
     }
